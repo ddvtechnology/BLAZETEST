@@ -48,19 +48,41 @@ def salvar_resultado(cor, numero, timestamp):
 def criar_driver():
     options = Options()
 
-    # Anti-deteccao de bot
+    # --- Headless obrigatório em servidor ---
+    options.add_argument("--headless=new")
+
+    # --- Crítico para containers (resolve o crash de /dev/shm) ---
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--no-zygote")
+    options.add_argument("--single-process")
+
+    # --- GPU / rendering ---
+    options.add_argument("--disable-gpu")
+    options.add_argument("--disable-software-rasterizer")
+    options.add_argument("--disable-3d-apis")
+
+    # --- Reduz uso de memória ---
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-background-networking")
+    options.add_argument("--disable-default-apps")
+    options.add_argument("--disable-sync")
+    options.add_argument("--disable-translate")
+    options.add_argument("--hide-scrollbars")
+    options.add_argument("--metrics-recording-only")
+    options.add_argument("--mute-audio")
+    options.add_argument("--no-first-run")
+    options.add_argument("--safebrowsing-disable-auto-update")
+
+    # --- Janela ---
+    options.add_argument("--window-size=1280,800")
+
+    # --- Anti-detecção de bot ---
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
 
-    # Estabilidade
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--window-size=1280,800")
-    options.add_argument("--disable-extensions")
-
-    # User-Agent real
+    # --- User-Agent real ---
     options.add_argument(
         "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -130,12 +152,6 @@ def aguardar_pagina(driver, timeout=60):
 
     log.error(f"Titulo da pagina: {driver.title}")
     log.error(f"URL atual: {driver.current_url}")
-
-    try:
-        driver.save_screenshot("screenshot_erro.png")
-        log.error("Screenshot salvo em screenshot_erro.png")
-    except Exception:
-        pass
 
     raise Exception("Nenhum seletor encontrado na pagina")
 
