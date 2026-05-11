@@ -3,12 +3,13 @@ primary_region = "gru"
 
 [build]
 
-# SEM http_service — não é uma aplicação web
+[processes]
+  app = "python3 coletor_blaze.py"
 
 [[vm]]
-  memory = "512mb"
+  memory = "1024mb"
   cpu_kind = "shared"
   cpus = 1
 
-[processes]
-  app = "python3 coletor_blaze.py"
+[deploy]
+  strategy = "immediate"
