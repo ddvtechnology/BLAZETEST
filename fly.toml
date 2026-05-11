@@ -3,13 +3,12 @@ primary_region = "gru"
 
 [build]
 
-[http_service]
-  force_https = false
-  internal_port = 8080
-  auto_stop_machines = false
-  auto_start_machines = true
+# SEM http_service — não é uma aplicação web
 
 [[vm]]
   memory = "512mb"
   cpu_kind = "shared"
   cpus = 1
+
+[processes]
+  app = "python3 coletor_blaze.py"
