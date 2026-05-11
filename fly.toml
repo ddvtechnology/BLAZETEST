@@ -1,14 +1,26 @@
-app = "app-cool-violet-8335"
-primary_region = "gru"
+# fly.toml app configuration file generated for blazetest on 2026-05-11T03:21:35Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'blazetest'
+primary_region = 'gru'
 
 [build]
 
-# SEM http_service — não é uma aplicação web
+[processes]
+  app = 'python3 coletor_blaze.py'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
 
 [[vm]]
-  memory = "512mb"
-  cpu_kind = "shared"
+  memory = '512mb'
+  cpu_kind = 'shared'
   cpus = 1
-
-[processes]
-  app = "python3 coletor_blaze.py"
+  memory_mb = 1024
