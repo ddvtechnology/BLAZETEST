@@ -92,7 +92,6 @@ def extrair_resultado(elemento):
         return None
 
 def capturar_lista(driver, n=5):
-    """Retorna uma lista com os N primeiros resultados visíveis."""
     try:
         itens = driver.find_elements(By.CSS_SELECTOR, ".sm-box")
         resultados = []
@@ -116,6 +115,11 @@ def aguardar_pagina(driver, timeout=60):
             return seletor
         except Exception:
             log.warning(f"Nao encontrado: {seletor}")
+
+    # Diagnóstico
+    log.error(f"Titulo: {driver.title}")
+    log.error(f"URL: {driver.current_url}")
+    log.error(f"HTML parcial: {driver.page_source[:500]}")
     raise Exception("Nenhum seletor encontrado na pagina")
 
 def coletor_continuo():
@@ -137,7 +141,6 @@ def coletor_continuo():
             log.info("Coletor ativo")
             log.info("-" * 50)
 
-            # Carrega o estado inicial da lista sem salvar
             lista_anterior = capturar_lista(driver, n=5)
             log.info(f"Estado inicial: {lista_anterior}")
 
@@ -156,18 +159,14 @@ def coletor_continuo():
                         time.sleep(POLLING)
                         continue
 
-                    # Compara o primeiro item com o primeiro da lista anterior
-                    # Se mudou, é porque saiu um resultado novo no topo
                     if lista_atual and lista_anterior:
                         if lista_atual[0] != lista_anterior[0]:
-                            # Quantos itens novos apareceram no topo?
                             novos = []
                             for item in lista_atual:
                                 if item == lista_anterior[0]:
                                     break
                                 novos.append(item)
 
-                            # Salva os novos em ordem cronológica (do mais antigo ao mais novo)
                             for cor, numero in reversed(novos):
                                 timestamp = datetime.datetime.now()
                                 emoji = {"Branco": "⚪", "Vermelho": "🔴", "Preto": "⚫"}.get(cor, "?")
