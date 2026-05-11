@@ -10,9 +10,6 @@ import datetime
 import logging
 import os
 
-# ==============================
-# LOGGING
-# ==============================
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -20,18 +17,12 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-# ==============================
-# SUPABASE
-# ==============================
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://raanrbjruegfqxmnxgpw.supabase.co")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJhYW5yYmpydWVnZnF4bW54Z3B3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyODk1MzgsImV4cCI6MjA5MTg2NTUzOH0.g8YHhDLYdbQAeN08QM5MND3dTxv5CDk2syIevazzZsI")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 URL = "https://blaze.bet.br/pt/games/double"
 
-# ==============================
-# SUPABASE: SALVAR
-# ==============================
 def salvar_resultado(cor, numero, timestamp):
     try:
         supabase.table("double_results").insert({
@@ -43,30 +34,17 @@ def salvar_resultado(cor, numero, timestamp):
     except Exception as e:
         log.error(f"Erro ao salvar: {e}")
 
-# ==============================
-# CHROME: CRIAR DRIVER
-# ==============================
 def criar_driver():
     options = Options()
-
-    # --- Binários do Chromium (instalado via apt) ---
     options.binary_location = "/usr/bin/chromium"
-
-    # --- Headless obrigatório em servidor ---
     options.add_argument("--headless=new")
-
-    # --- Crítico para containers ---
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--no-zygote")
     options.add_argument("--single-process")
-
-    # --- GPU / rendering ---
     options.add_argument("--disable-gpu")
     options.add_argument("--disable-software-rasterizer")
     options.add_argument("--disable-3d-apis")
-
-    # --- Reduz uso de memória ---
     options.add_argument("--disable-extensions")
     options.add_argument("--disable-background-networking")
     options.add_argument("--disable-default-apps")
@@ -75,74 +53,59 @@ def criar_driver():
     options.add_argument("--hide-scrollbars")
     options.add_argument("--mute-audio")
     options.add_argument("--no-first-run")
-
-    # --- Janela ---
     options.add_argument("--window-size=1280,800")
-
-    # --- Anti-detecção de bot ---
     options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    options.add_experimental_option("useAutomationExtension", False)
-
-    # --- User-Agent real ---
     options.add_argument(
         "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/124.0.0.0 Safari/537.36"
     )
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option("useAutomationExtension", False)
 
-    # --- ChromeDriver do Chromium ---
     service = Service("/usr/bin/chromedriver")
-
     driver = webdriver.Chrome(service=service, options=options)
     driver.set_page_load_timeout(60)
-
-    # Remove flag webdriver do JS
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
         "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
     })
-
     return driver
 
-# ==============================
-# EXTRAI RESULTADO
-# ==============================
 def extrair_resultado(elemento):
     try:
         classes = elemento.get_attribute("class")
-
         if "white" in classes:
             return ("Branco", "0")
-
         numero_els = elemento.find_elements(By.CLASS_NAME, "number")
         if not numero_els:
             return None
-
         numero = numero_els[0].text.strip()
         if not numero:
             return None
-
         if "red" in classes:
             return ("Vermelho", numero)
         elif "black" in classes:
             return ("Preto", numero)
-
         return None
     except Exception as e:
         log.debug(f"Erro ao extrair: {e}")
         return None
 
-# ==============================
-# AGUARDA PAGINA CARREGAR
-# ==============================
-def aguardar_pagina(driver, timeout=60):
-    seletores = [
-        ".entries.main",
-        ".sm-box",
-        "[class*='entries']",
-        "[class*='sm-box']",
-    ]
+def capturar_lista(driver, n=5):
+    """Retorna uma lista com os N primeiros resultados visíveis."""
+    try:
+        itens = driver.find_elements(By.CSS_SELECTOR, ".sm-box")
+        resultados = []
+        for item in itens[:n]:
+            r = extrair_resultado(item)
+            if r:
+                resultados.append(r)
+        return resultados
+    except Exception:
+        return []
 
+def aguardar_pagina(driver, timeout=60):
+    seletores = [".entries.main", ".sm-box", "[class*='entries']", "[class*='sm-box']"]
     for seletor in seletores:
         try:
             log.info(f"Aguardando seletor: {seletor}")
@@ -153,19 +116,13 @@ def aguardar_pagina(driver, timeout=60):
             return seletor
         except Exception:
             log.warning(f"Nao encontrado: {seletor}")
-            continue
-
-    log.error(f"Titulo da pagina: {driver.title}")
-    log.error(f"URL atual: {driver.current_url}")
-
     raise Exception("Nenhum seletor encontrado na pagina")
 
-# ==============================
-# LOOP PRINCIPAL
-# ==============================
 def coletor_continuo():
     RECONEXAO_ESPERA = 15
-    POLLING = 0.3
+    POLLING = 2.0
+    ERROS_MAX = 5
+    REINICIO_MIN = 20
 
     while True:
         driver = None
@@ -175,44 +132,61 @@ def coletor_continuo():
 
             log.info(f"Acessando {URL}...")
             driver.get(URL)
-
             aguardar_pagina(driver, timeout=60)
 
             log.info("Coletor ativo")
             log.info("-" * 50)
 
-            ultimo_id = None
+            # Carrega o estado inicial da lista sem salvar
+            lista_anterior = capturar_lista(driver, n=5)
+            log.info(f"Estado inicial: {lista_anterior}")
+
+            erros_seguidos = 0
+            inicio = time.time()
 
             while True:
+                if time.time() - inicio > REINICIO_MIN * 60:
+                    log.info(f"Reinicio preventivo após {REINICIO_MIN} min")
+                    break
+
                 try:
-                    itens = driver.find_elements(By.CSS_SELECTOR, ".sm-box")
+                    lista_atual = capturar_lista(driver, n=5)
 
-                    if not itens:
+                    if not lista_atual:
                         time.sleep(POLLING)
                         continue
 
-                    primeiro = itens[0]
-                    elem_id = primeiro.id
+                    # Compara o primeiro item com o primeiro da lista anterior
+                    # Se mudou, é porque saiu um resultado novo no topo
+                    if lista_atual and lista_anterior:
+                        if lista_atual[0] != lista_anterior[0]:
+                            # Quantos itens novos apareceram no topo?
+                            novos = []
+                            for item in lista_atual:
+                                if item == lista_anterior[0]:
+                                    break
+                                novos.append(item)
 
-                    if elem_id == ultimo_id:
-                        time.sleep(POLLING)
-                        continue
+                            # Salva os novos em ordem cronológica (do mais antigo ao mais novo)
+                            for cor, numero in reversed(novos):
+                                timestamp = datetime.datetime.now()
+                                emoji = {"Branco": "⚪", "Vermelho": "🔴", "Preto": "⚫"}.get(cor, "?")
+                                log.info(f"{emoji} {cor} {numero}")
+                                salvar_resultado(cor, numero, timestamp.isoformat())
 
-                    resultado = extrair_resultado(primeiro)
-                    if resultado is None:
-                        time.sleep(POLLING)
-                        continue
+                            lista_anterior = lista_atual
 
-                    cor, numero = resultado
-                    timestamp = datetime.datetime.now()
-                    emoji = {"Branco": "⚪", "Vermelho": "🔴", "Preto": "⚫"}.get(cor, "?")
+                    elif lista_atual and not lista_anterior:
+                        lista_anterior = lista_atual
 
-                    log.info(f"{emoji} {cor} {numero}")
-                    salvar_resultado(cor, numero, timestamp.isoformat())
-                    ultimo_id = elem_id
+                    erros_seguidos = 0
 
                 except Exception as e:
-                    log.warning(f"Erro no loop: {e}")
+                    erros_seguidos += 1
+                    log.warning(f"Erro no loop ({erros_seguidos}/{ERROS_MAX}): {type(e).__name__}")
+                    if erros_seguidos >= ERROS_MAX:
+                        log.error("Muitos erros, reiniciando Chrome...")
+                        break
 
                 time.sleep(POLLING)
 
