@@ -1,5 +1,6 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -48,10 +49,13 @@ def salvar_resultado(cor, numero, timestamp):
 def criar_driver():
     options = Options()
 
+    # --- Binários do Chromium (instalado via apt) ---
+    options.binary_location = "/usr/bin/chromium"
+
     # --- Headless obrigatório em servidor ---
     options.add_argument("--headless=new")
 
-    # --- Crítico para containers (resolve o crash de /dev/shm) ---
+    # --- Crítico para containers ---
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--no-zygote")
@@ -69,10 +73,8 @@ def criar_driver():
     options.add_argument("--disable-sync")
     options.add_argument("--disable-translate")
     options.add_argument("--hide-scrollbars")
-    options.add_argument("--metrics-recording-only")
     options.add_argument("--mute-audio")
     options.add_argument("--no-first-run")
-    options.add_argument("--safebrowsing-disable-auto-update")
 
     # --- Janela ---
     options.add_argument("--window-size=1280,800")
@@ -89,7 +91,10 @@ def criar_driver():
         "Chrome/124.0.0.0 Safari/537.36"
     )
 
-    driver = webdriver.Chrome(options=options)
+    # --- ChromeDriver do Chromium ---
+    service = Service("/usr/bin/chromedriver")
+
+    driver = webdriver.Chrome(service=service, options=options)
     driver.set_page_load_timeout(60)
 
     # Remove flag webdriver do JS
